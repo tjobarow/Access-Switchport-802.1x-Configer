@@ -1,0 +1,18 @@
+---
+#Gather facts from access switches
+- name: Gather facts from switches
+  #Reference the switches group from inventory file labhosts.yml
+  hosts: switches
+
+  #Perform info gathering
+  tasks:
+    - name: Gather ansible facts about access switches
+      #Gather ios_facts
+      cisco.ios.ios_facts:
+        available_network_resources: 
+        #gather_subset: all
+        #gather_network_resources: all
+
+    #Print facts to debug CLI
+    #- debug:
+    #    msg: "{{ ansible_facts }}"

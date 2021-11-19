@@ -1,0 +1,25 @@
+---
+- name: Gather IOS L2 interfaces in access mode and configure for 802.1x
+  hosts: production
+  gather_facts: no
+
+  #Tasks to perform
+  tasks:
+  - name: gather IOS facts for layer 2 interfaces
+    ios_facts:
+      gather_network_resources: l2_interfaces
+
+  #save the gathered l2 interface facts to JSON file, then save to local disk
+  - name: Create NICE JSON file
+    copy:
+      content: |
+        {{ ansible_network_resources['l2_interfaces'] | to_nice_json }}
+      dest: /home/tobarows/{{inventory_hostname}}_facts.json
+
+  - name: Configure access interfaces for 802.1x
+    debug:
+            msg: "Interface: {{item.name}}"
+            msg: "Mode: {{ item.mode }}"
+            msg: "VLAN:{{item.access.vlan}}"
+    with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
+    when: item.mode is defined and item.mode == "access"

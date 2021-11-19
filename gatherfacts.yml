@@ -1,0 +1,27 @@
+---
+#Gather facts from access switches
+- name: Gather facts from switches
+  #Reference the switches group from inventory file labhosts.yml
+  hosts: switches
+
+  #Perform info gathering
+  tasks:
+    - name: Gather ansible facts about access switches
+      #Gather ios_facts
+      ios_facts:
+        #By default only gathers config, get all facts possible
+        gather_subset:
+          - all
+    
+    #Print facts to debug CLI
+    - debug:
+        msg: "{{ ansible_facts }}"
+
+## WRITE FACTS TO FILE(S)
+# WRITE FACTS TO JSON
+    - name: Create NICE JSON file
+      copy:
+        content: |
+          {{ ansible_facts | to_nice_json }}
+        dest: /home/tobarows/{{inventory_hostname}}_facts.json
+
