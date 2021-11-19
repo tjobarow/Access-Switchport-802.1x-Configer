@@ -1,6 +1,6 @@
 ---
 - name: Gather IOS L2 interfaces in access mode and configure for 802.1x
-  hosts: production
+  hosts: testing
   gather_facts: no
 
   #Tasks to perform
@@ -14,12 +14,10 @@
     copy:
       content: |
         {{ ansible_network_resources['l2_interfaces'] | to_nice_json }}
-      dest: /home/tobarows/{{inventory_hostname}}_facts.json
+      dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_facts.json
 
   - name: Configure access interfaces for 802.1x
     debug:
-            msg: "Interface: {{item.name}}"
-            msg: "Mode: {{ item.mode }}"
-            msg: "VLAN:{{item.access.vlan}}"
+            msg: "Interface: {{item.name}} is set to {{ item.mode }} on VLAN:{{item.access.vlan}}"
     with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
     when: item.mode is defined and item.mode == "access"
