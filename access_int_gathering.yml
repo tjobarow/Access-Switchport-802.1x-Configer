@@ -21,11 +21,72 @@
       path: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_access_switchport.txt
       state: touch
 
-  - name: Configure access interfaces for 802.1x
+  - name: List interfaces that are access mode
     lineinfile:
       line: "Interface: {{item.name}} is set to {{ item.mode }} on VLAN:{{item.access.vlan}}"
       insertafter: EOF  
       dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_access_switchport.txt
+    delegate_to: 127.0.0.1
+    with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
+    when: item.mode is defined and item.mode == "access"
+
+  - name: Check if pre-config sh runs exist, if not create it
+    copy:
+      content: ""
+      dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_pre_radius_int_config.txt
+      force: no
+ 
+  - name: Append each interface show running-config to file create (if necessary) in last task
+    ios_command:
+      commands: show running-config interface {{item.name}}
+    register: pre_radius_interface_config
+ 
+  - name: Save int configs to file before configuring for IBNS 1.0 RADIUS  
+    lineinfile:
+      line: pre_radius_interface_config
+      insertafter: EOF
+      dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_pre_radius_int_config.txt
+    delegate_to: 127.0.0.1
+    with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
+    when: item.mode is defined and item.mode == "access"
+
+  - name: Configure access interfaces for 802.1x
+    ios_config:
+      lines:
+        - description ACCESS_INTERFACE
+        - authentication event fail action next-method
+        - authentication event server dead action authorize vlan {{item.access.vlan}}
+        - authentication event server dead action authorize voice
+        - authentication event server alive action reinitialize
+        - authentication host-mode multi-auth
+        - authentication open
+        - authentication order mab dot1x
+        - authentication priority dot1x mab
+        - authentication port-control auto
+        - authentication periodic
+        - authentication timer reauthenticate server
+        - authentication violation restrict
+        - mab
+        - dot1x pae authenticator
+        - dot1x timeout tx-period 10
+      parents: "interface {{ item.name }}"
+    with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
+    when: item.mode is defined and item.mode == "access"
+
+  - name: Check if POST-config sh run int text file exist, if not create it
+    copy:
+      content: ""
+      dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_POST_radius_int_config.txT
+      force: no
+
+  - name: Append interfaces show running-config to file created (if didn't exist in last task)
+    ios_command:
+      commands: show running-config interface {{item.name}}
+    register: post_radius_interface_config
+    lineinfile:
+      line: post_radius_interface_config
+      insertafter: EOF
+      dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_POST_radius_int_config.txt
     delegate_to: 127.0.0.1
     with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
     when: item.mode is defined and item.mode == "access"
