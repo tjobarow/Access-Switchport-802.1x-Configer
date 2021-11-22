@@ -1,0 +1,62 @@
+---
+- name: Gather IOS L2 interfaces in access mode and configure for 802.1x
+  hosts: testing
+  gather_facts: no
+
+  #Tasks to perform
+  tasks:
+  - name: gather IOS facts for layer 2 interfaces
+    ios_facts:
+      gather_network_resources: l2_interfaces
+
+  #save the gathered l2 interface facts to JSON file, then save to local disk
+  - name: Create NICE JSON file
+    copy:
+      content: |
+        {{ ansible_network_resources['l2_interfaces'] | to_nice_json }}
+      dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_facts.json
+
+  - name: "Create a new file"
+    file:
+      path: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_access_switchport.txt
+      state: touch
+
+  - name: List interfaces that are access mode
+    lineinfile:
+      line: "Interface: {{item.name}} is set to {{ item.mode }} on VLAN:{{item.access.vlan}}"
+      insertafter: EOF  
+      dest: /home/tobarows/gather_facts_switches/{{inventory_hostname}}_access_switchport.txt
+    delegate_to: 127.0.0.1
+    with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
+    when: item.mode is defined and item.mode == "access"
+    
+    #
+    # - name: Backup IOS config
+    # ios_config:
+    # backup: yes
+    # backup_options:
+    #   filename: "{{inventory_hostname}}_pre_radius_backup.cfg"
+    #   dir_path: /home/tobarows/gather_facts_switches/
+
+  - name: Configure access interfaces for 802.1x
+    ios_config:
+      lines:
+        - no description ACCESS_INTERFACE
+        - no authentication event fail action next-method
+        - no authentication event server dead action authorize vlan {{item.access.vlan}}
+        - no authentication event server dead action authorize voice
+        - no authentication event server alive action reinitialize
+        - no authentication host-mode multi-auth
+        - no authentication open
+        - no authentication order mab dot1x
+        - no authentication priority dot1x mab
+        - no authentication port-control auto
+        - no authentication periodic
+        - no authentication timer reauthenticate server
+        - no authentication violation restrict
+        - no mab
+        - no dot1x pae authenticator
+        - no dot1x timeout tx-period 10
+      parents: "interface {{ item.name }}"
+    with_items: "{{ ansible_network_resources['l2_interfaces'] }}"
+    when: item.mode is defined and item.mode == "access"
